@@ -1,0 +1,19 @@
+{
+  "name": "mikser-whitebox",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/almero-digital-marketing/mikser-whitebox.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/almero-digital-marketing/mikser-whitebox/issues"
+  },
+  "homepage": "https://github.com/almero-digital-marketing/mikser-whitebox#readme"
+}
