@@ -80,6 +80,7 @@ module.exports = function (mikser, context) {
     } else {
         mikser.on('mikser.manager.importDocument', (document) => {
             if (!document.meta.type && !document.meta.layout) return Promise.resolve()
+            document.render = false
             let data = {
                 passportId: uuidv1(),
                 vaultId: aguid(document._id),
