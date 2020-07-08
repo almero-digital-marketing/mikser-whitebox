@@ -1,6 +1,6 @@
 {
   "name": "mikser-whitebox",
-  "version": "1.0.3",
+  "version": "1.0.11",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -21,6 +21,7 @@
     "axios": "^0.19.2",
     "bluebird": "^3.7.2",
     "form-data": "^3.0.0",
+    "glob-promise": "^3.4.0",
     "hasha": "^5.2.0",
     "lodash": "^4.17.15",
     "uuid": "^8.1.0"
