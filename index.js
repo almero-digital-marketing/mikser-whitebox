@@ -130,6 +130,7 @@ module.exports = function (mikser, context) {
 			}
 			if (!options.clear) {
 				queue.push(() => {
+					console.log('📄', data.refId)
 					return plugin.api('data', '/api/vault/keep/one', data, options)
 				})
 			}
