@@ -103,7 +103,7 @@ module.exports = function (mikser, context) {
 				.catch((err) => console.error('Error clearing:', err))
 		}
 		let queue = Queue({
-			concurrency: 1,
+			concurrency: 3,
 			autostart: true
 		})
 
