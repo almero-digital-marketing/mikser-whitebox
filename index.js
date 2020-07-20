@@ -130,7 +130,7 @@ module.exports = function (mikser, context) {
 			}
 			if (!options.clear) {
 				queue.push(() => {
-					console.log('📄', data.refId)
+					console.log('✔️', data.refId)
 					return plugin.api('data', '/api/vault/keep/one', data, options)
 				})
 			}
@@ -143,6 +143,7 @@ module.exports = function (mikser, context) {
 			}
 			if (!options.clear) {
 				queue.push(() => {
+					console.log('❌', document._id)
 					return plugin.api('data', '/api/vault/remove', data, options)
 				})
 			}
@@ -153,7 +154,7 @@ module.exports = function (mikser, context) {
 				let files = await glob('storage/**/*', { cwd: mikser.config.outputFolder })
 				for (let file of files) {
 					file = path.join(mikser.config.outputFolder, file)
-					console.log('WhiteBox sync:', file)
+					console.log('📦', file)
 					const stat = await fs.lstatAsync(file)
 					if (stat.isFile()) {
 						await plugin.upload(file)
