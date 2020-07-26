@@ -4,20 +4,21 @@ const glob = require('glob-promise')
 const aguid = require('aguid')
 const { v1: uuidv1 } = require('uuid')
 const hasha = require('hasha')
-var fs = require('fs-extra-promise')
+const fs = require('fs-extra-promise')
 const path = require('path')
 const FormData = require('form-data')
 const Promise = require('bluebird')
 const Queue = require('queue')
-var cluster = require('cluster');
+const cluster = require('cluster')
+const { throttle } = require('throttle-debounce')
 
 module.exports = function (mikser, context) {
 	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
 		config || {
 			services: {
-				data: {
-					url: 'https://data.whitebox.pro',
+				feed: {
+					url: 'https://feed.whitebox.pro',
 				},
 				storage: {
 					url: 'https://storage.whitebox.pro',
@@ -36,8 +37,8 @@ module.exports = function (mikser, context) {
 		}
 	}
 
-	if (!options.services.data.token) {
-		console.error('WhtieBox data token is missing.')
+	if (!options.services.feed.token) {
+		console.error('WhtieBox feed token is missing.')
 		return Promise.resolve()
 	}
 
@@ -90,11 +91,16 @@ module.exports = function (mikser, context) {
 	
 	}
 
+	const clearCache = throttle(1000, () => {
+		console.log('Clear cache')
+		return plugin.api('feed', '/api/vault/clear/cache', {}, options)
+	})
+
 	if (!context) {
 		let clear = Promise.resolve()
 		if (options.clear || options.refresh) {
 			console.log('Clear whtiebox data')
-			clear = api('data', '/api/vault/clear', {})
+			clear = api('feed', '/api/vault/clear', {})
 				.then(() => {
 					if (options.clear) {
 						return axios.post(options.services.storage.url + '/' + options.services.storage.token + '/clear', {})
@@ -130,8 +136,9 @@ module.exports = function (mikser, context) {
 			}
 			if (!options.clear) {
 				queue.push(() => {
+					clearCache()
 					console.log('✔️', data.refId)
-					return plugin.api('data', '/api/vault/keep/one', data, options)
+					return plugin.api('feed', '/api/vault/keep/one', data, options)
 				})
 			}
 		})
@@ -143,8 +150,9 @@ module.exports = function (mikser, context) {
 			}
 			if (!options.clear) {
 				queue.push(() => {
+					clearCache()
 					console.log('❌', document._id)
-					return plugin.api('data', '/api/vault/remove', data, options)
+					return plugin.api('feed', '/api/vault/remove', data, options)
 				})
 			}
 		})
