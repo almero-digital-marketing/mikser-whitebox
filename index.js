@@ -100,7 +100,7 @@ module.exports = function (mikser, context) {
 		let clear = Promise.resolve()
 		if (options.clear || options.refresh) {
 			console.log('Clear whtiebox data')
-			clear = api('feed', '/api/vault/clear', {})
+			clear = plugin.api('feed', '/api/vault/clear', {})
 				.then(() => {
 					if (options.clear) {
 						return axios.post(options.services.storage.url + '/' + options.services.storage.token + '/clear', {})
