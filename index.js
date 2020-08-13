@@ -114,13 +114,13 @@ module.exports = function (mikser, context) {
 		})
 
 		mikser.on('mikser.manager.importDocument', (document) => {
-			if (!document.meta.type && !document.meta.layout) return Promise.resolve()
+			if (!document.meta.layout) return Promise.resolve()
 			document.render = false
 			let data = {
 				passportId: uuidv1(),
 				vaultId: aguid(document._id),
 				refId: document.url.replace('/index.html', '') || '/',
-				type: document.meta.type || document.meta.layout,
+				type: document.meta.layout,
 				data: _.pick(document, ['meta', 'stamp', 'importDate']),
 				stamp: document.stamp,
 				date: document.mtime,
