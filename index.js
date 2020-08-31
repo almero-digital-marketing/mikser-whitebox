@@ -11,6 +11,7 @@ const Promise = require('bluebird')
 const Queue = require('queue')
 const cluster = require('cluster')
 const { throttle } = require('throttle-debounce')
+const { flockAsync } = Promise.promisifyAll(require('fs-ext'))	
 
 module.exports = function (mikser, context) {
 	let config = mikser.config['whitebox']
@@ -42,6 +43,7 @@ module.exports = function (mikser, context) {
 		return Promise.resolve()
 	}
 
+	let pendingUploads = {}
 	let plugin = {
 		api(service, url, data) {
 			return axios
@@ -64,29 +66,42 @@ module.exports = function (mikser, context) {
 				})
 		},
 		upload(file) {
-			console.log('Checking md5:', file)
-			let relative = file.replace(mikser.config.outputFolder, '')
-			return axios
-				.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', {
-					file: relative,
-				})
-				.then((response) => {
-					return hasha.fromFile(file, { algorithm: 'md5' }).then((hash) => {
-						console.log('MD5:', hash, response.data.hash)
-						if (!response.data.success || hash != response.data.hash) {
-							console.log('Uploading:', file)
-							let form = new FormData()
-							form.append(relative, fs.createReadStream(file))
-							const submit = Promise.promisify(form.submit, { context: form })
-							return submit(options.services.storage.url + '/' + options.services.storage.token + '/upload')
-								.then((res) => {
-									console.log('Uploaded:', file, res.statusCode, res.statusMessage)
-									res.resume()
-								})
-								.catch((err) => console.error('Error uplaoding:', err))
-						}
+			if (pendingUploads[file]) return Promise.resolve()
+			pendingUploads[file] = true
+			return fs.openAsync(file, 'r').then(fd => {
+				return flockAsync(fd, 'sh').then(() => {
+					// mikser.diagnostics.log(this, 'debug', `[whitebox] File locked: ${file}`)
+					let relative = file.replace(mikser.config.outputFolder, '')
+					return axios
+					.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', {
+						file: relative,
 					})
+					.then((response) => {
+						return hasha.fromFile(file, { algorithm: 'md5' }).then((hash) => {
+								// mikser.diagnostics.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
+								if (!response.data.success || hash != response.data.hash) {
+									let form = new FormData()
+									form.append(relative, fs.createReadStream(file))
+									const submit = Promise.promisify(form.submit, { context: form })
+									return submit(options.services.storage.url + '/' + options.services.storage.token + '/upload')
+										.then((res) => {
+											console.log('📦 Uploaded:', file, res.statusCode, res.statusMessage)
+											res.resume()
+										})
+										.catch((err) => console.error('Error uplaoding:', err))
+								}
+							})
+						})
+						.then(() => {
+							return flockAsync(fd, 'un')
+						})
+						.catch(() => {
+							return flockAsync(fd, 'un')
+						})
+				}).catch(err => {
+					console.error('Lock failed:', file, err)
 				})
+			}).then(() => delete pendingUploads[file])
 		}
 	
 	}
@@ -151,7 +166,7 @@ module.exports = function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('❌', document._id)
+					console.log('🗑️', document._id)
 					return plugin.api('feed', '/api/vault/remove', data, options)
 				})
 			}
@@ -162,12 +177,25 @@ module.exports = function (mikser, context) {
 				let files = await glob('storage/**/*', { cwd: mikser.config.outputFolder })
 				for (let file of files) {
 					file = path.join(mikser.config.outputFolder, file)
-					console.log('📦', file)
 					const stat = await fs.lstatAsync(file)
 					if (stat.isFile()) {
 						await plugin.upload(file)
 					}
 				}
+			}
+		})
+
+		mikser.on('mikser.watcher.fileAction', async (event, file) => {
+			let relative = file.replace(mikser.config.filesFolder, '')
+			if (event == 'unlink' && relative.indexOf('storage') != -1) {
+				return axios
+				.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', {
+					file: relative,
+				})
+				.then(() => {
+					console.log('🗑️', relative)
+					return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
+				})
 			}
 		})
 
