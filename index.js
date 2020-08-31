@@ -152,7 +152,7 @@ module.exports = function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('✔️', data.refId)
+					console.log('✔️ Keep:', data.refId)
 					return plugin.api('feed', '/api/vault/keep/one', data, options)
 				})
 			}
