@@ -166,7 +166,7 @@ module.exports = function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('🗑️', document._id)
+					console.log('🗑️ Deleted:', document._id)
 					return plugin.api('feed', '/api/vault/remove', data, options)
 				})
 			}
@@ -193,7 +193,7 @@ module.exports = function (mikser, context) {
 					file: relative,
 				})
 				.then(() => {
-					console.log('🗑️', relative)
+					console.log('🗑️ Deleted:', relative)
 					return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
 				})
 			}
