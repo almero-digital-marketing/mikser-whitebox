@@ -8,12 +8,15 @@ const fs = require('fs-extra-promise')
 const path = require('path')
 const FormData = require('form-data')
 const Promise = require('bluebird')
+const os = require('os')
 const Queue = require('queue')
 const cluster = require('cluster')
 const { throttle } = require('throttle-debounce')
 const { flockAsync } = Promise.promisifyAll(require('fs-ext'))	
+const { machineIdSync } = require('node-machine-id')
 
 module.exports = function (mikser, context) {
+	const machineId = machineIdSync() + '_' + os.hostname()
 	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
 		config || {
@@ -30,17 +33,27 @@ module.exports = function (mikser, context) {
 	if (cluster.isMaster) {
 		mikser.cli.option('-wc, --whitebox-clear', 'clear WhiteBox documents').init()
 		mikser.cli.option('-wr, --whitebox-refresh', 'refresh WhiteBox documents').init()
+		mikser.cli.option('-wg, --whitebox-global', 'use WhiteBox global context').init()
+
 		if (mikser.cli.whiteboxClear) {
 			options.clear = true
 		}
 		if (mikser.cli.whiteboxRefresh) {
 			option.refresh = true
 		}
+		if (mikser.cli.whiteboxGlobal) {
+			option.global = true
+		}
 	}
 
 	if (!options.services.feed.token) {
 		console.error('WhtieBox feed token is missing.')
 		return Promise.resolve()
+	}
+
+	if (!options.whiteboxGlobal) {
+		options.expire = options.expire || '10 days'
+		console.log('Expire:', options.expire)
 	}
 
 	let pendingUploads = {}
@@ -72,20 +85,26 @@ module.exports = function (mikser, context) {
 				return flockAsync(fd, 'sh').then(() => {
 					// mikser.diagnostics.log(this, 'debug', `[whitebox] File locked: ${file}`)
 					let relative = file.replace(mikser.config.outputFolder, '')
+					let data = {
+						file: relative
+					}
+					if (!config.global) data.context = machineId
 					return axios
-					.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', {
-						file: relative,
-					})
+					.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', data)
 					.then((response) => {
 						return hasha.fromFile(file, { algorithm: 'md5' }).then((hash) => {
 								// mikser.diagnostics.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
 								if (!response.data.success || hash != response.data.hash) {
 									let form = new FormData()
 									form.append(relative, fs.createReadStream(file))
+									if (!config.global) {
+										form.expire('expire', options.expire)
+										form.append('context', machineId)
+									}
 									const submit = Promise.promisify(form.submit, { context: form })
 									return submit(options.services.storage.url + '/' + options.services.storage.token + '/upload')
 										.then((res) => {
-											console.log('📦 Uploaded:', file, res.statusCode, res.statusMessage)
+											console.log('📦', file, res.statusCode, res.statusMessage)
 											res.resume()
 										})
 										.catch((err) => console.error('Error uplaoding:', err))
@@ -102,20 +121,36 @@ module.exports = function (mikser, context) {
 					console.error('Lock failed:', file, err)
 				})
 			}).then(() => delete pendingUploads[file])
+		},
+		unlink(file) {
+			let relative = file.replace(mikser.config.filesFolder, '')
+			let data = {
+				file: relative
+			}
+			if (!config.global) data.context = machineId
+			return axios
+			.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', data)
+			.then(() => {
+				console.log('🗑️', relative)
+				return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
+			})
 		}
-	
 	}
 
 	const clearCache = throttle(1000, () => {
 		console.log('Clear cache')
-		return plugin.api('feed', '/api/vault/clear/cache', {}, options)
+		let data = {}
+		if (!config.global) data.context = machineId
+		return plugin.api('feed', '/api/catalog/clear/cache', data, options)
 	})
 
 	if (!context) {
 		let clear = Promise.resolve()
 		if (options.clear || options.refresh) {
 			console.log('Clear whtiebox data')
-			clear = plugin.api('feed', '/api/vault/clear', {})
+			let data = {}
+			if (!config.global) data.context = machineId
+			clear = plugin.api('feed', '/api/catalog/clear', data)
 				.then(() => {
 					if (options.clear) {
 						return axios.post(options.services.storage.url + '/' + options.services.storage.token + '/clear', {})
@@ -137,8 +172,11 @@ module.exports = function (mikser, context) {
 				refId: document.url.replace('/index.html', '') || '/',
 				type: document.meta.layout,
 				data: _.pick(document, ['meta', 'stamp', 'importDate']),
-				stamp: document.stamp,
 				date: document.mtime,
+			}
+			if (!config.global) {
+				data.context = machineId
+				data.expire = options.expire
 			}
 			if (mikser.config.shared) {
 				for (let share of mikser.config.shared) {
@@ -152,8 +190,8 @@ module.exports = function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('✔️ Keep:', data.refId)
-					return plugin.api('feed', '/api/vault/keep/one', data, options)
+					console.log('✔️', data.refId)
+					return plugin.api('feed', '/api/catalog/keep/one', data, options)
 				})
 			}
 		})
@@ -163,11 +201,12 @@ module.exports = function (mikser, context) {
 			let data = {
 				vaultId: aguid(document._id),
 			}
+			if (!config.global) data.context = machineId
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('🗑️ Deleted:', document._id)
-					return plugin.api('feed', '/api/vault/remove', data, options)
+					console.log('🗑️', document._id)
+					return plugin.api('feed', '/api/catalog/remove', data, options)
 				})
 			}
 		})
@@ -186,16 +225,8 @@ module.exports = function (mikser, context) {
 		})
 
 		mikser.on('mikser.watcher.fileAction', async (event, file) => {
-			let relative = file.replace(mikser.config.filesFolder, '')
-			if (event == 'unlink' && relative.indexOf('storage') != -1) {
-				return axios
-				.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', {
-					file: relative,
-				})
-				.then(() => {
-					console.log('🗑️ Deleted:', relative)
-					return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
-				})
+			if (event == 'unlink' && file.indexOf('storage') != -1) {
+				await plugin.unlink(file)
 			}
 		})
 
