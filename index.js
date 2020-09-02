@@ -176,7 +176,7 @@ module.exports = function (mikser, context) {
 		})
 
 		mikser.on('mikser.manager.importDocument', (document) => {
-			if (!document.meta.layout) return Promise.resolve()
+			if (document.meta.target != 'whitebox' || !document.meta.layout) return Promise.resolve()
 			document.render = false
 			let data = {
 				passportId: uuidv1(),
@@ -209,6 +209,7 @@ module.exports = function (mikser, context) {
 		})
 
 		mikser.on('mikser.manager.deleteDocument', (document) => {
+			if (document.meta.target != 'whitebox' || !document.meta.layout) return Promise.resolve()
 			console.log('Removing vault:', document._id)
 			let data = {
 				vaultId: aguid(document._id),
