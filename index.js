@@ -95,26 +95,38 @@ module.exports = function (mikser, context) {
 						return hasha.fromFile(file, { algorithm: 'md5' }).then((hash) => {
 								// mikser.diagnostics.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
 								if (!response.data.success || hash != response.data.hash) {
+									let uploadHeaders = {}
+									if (!config.global) {
+										uploadHeaders = {
+											expire: options.expire,
+											context: machineId
+										}
+									}
 									let form = new FormData()
 									form.append(relative, fs.createReadStream(file))
-									if (!config.global) {
-										form.expire('expire', options.expire)
-										form.append('context', machineId)
-									}
-									const submit = Promise.promisify(form.submit, { context: form })
-									return submit(options.services.storage.url + '/' + options.services.storage.token + '/upload')
-										.then((res) => {
-											console.log('📦', file, res.statusCode, res.statusMessage)
-											res.resume()
+									let formHeaders = form.getHeaders()
+									return axios
+										.post(options.services.storage.url + '/upload', form, {
+											headers: {
+												Authorization: 'Bearer ' + options.services.storage.token,
+												...formHeaders,
+												...uploadHeaders,
+											},
+											maxContentLength: Infinity,
+											maxBodyLength: Infinity
 										})
-										.catch((err) => console.error('Error uplaoding:', err))
+										.then(() => {
+											console.log('📦', file)
+										})
+										.catch((err) => console.error('Error uplaoding:', err))									
 								}
 							})
 						})
 						.then(() => {
 							return flockAsync(fd, 'un')
 						})
-						.catch(() => {
+						.catch(err => {
+							console.error(err)
 							return flockAsync(fd, 'un')
 						})
 				}).catch(err => {
