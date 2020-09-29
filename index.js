@@ -16,7 +16,7 @@ const { flockAsync } = Promise.promisifyAll(require('fs-ext'))
 const { machineIdSync } = require('node-machine-id')
 
 module.exports = function (mikser, context) {
-	const machineId = machineIdSync() + '_' + os.hostname()
+	const machineId = machineIdSync() + '_' + os.hostname() + '_' + os.userInfo().username
 	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
 		config || {
