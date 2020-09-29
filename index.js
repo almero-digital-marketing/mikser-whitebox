@@ -39,10 +39,10 @@ module.exports = function (mikser, context) {
 			options.clear = true
 		}
 		if (mikser.cli.whiteboxRefresh) {
-			option.refresh = true
+			options.refresh = true
 		}
 		if (mikser.cli.whiteboxGlobal) {
-			option.global = true
+			options.global = true
 		}
 	}
 
