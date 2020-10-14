@@ -88,7 +88,7 @@ module.exports = function (mikser, context) {
 					let data = {
 						file: relative
 					}
-					if (!config.global) data.context = machineId
+					if (!options.global) data.context = machineId
 					return axios
 					.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', data)
 					.then((response) => {
@@ -96,7 +96,7 @@ module.exports = function (mikser, context) {
 								// mikser.diagnostics.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
 								if (!response.data.success || hash != response.data.hash) {
 									let uploadHeaders = {}
-									if (!config.global) {
+									if (!options.global) {
 										uploadHeaders = {
 											expire: options.expire,
 											context: machineId
@@ -139,7 +139,7 @@ module.exports = function (mikser, context) {
 			let data = {
 				file: relative
 			}
-			if (!config.global) data.context = machineId
+			if (!options.global) data.context = machineId
 			return axios
 			.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', data)
 			.then(() => {
@@ -152,7 +152,7 @@ module.exports = function (mikser, context) {
 	const clearCache = throttle(1000, () => {
 		console.log('Clear cache')
 		let data = {}
-		if (!config.global) data.context = machineId
+		if (!options.global) data.context = machineId
 		return plugin.api('feed', '/api/catalog/clear/cache', data, options)
 	})
 
@@ -161,7 +161,7 @@ module.exports = function (mikser, context) {
 		if (options.clear || options.refresh) {
 			console.log('Clear whtiebox data')
 			let data = {}
-			if (!config.global) data.context = machineId
+			if (!options.global) data.context = machineId
 			clear = plugin.api('feed', '/api/catalog/clear', data)
 				.then(() => {
 					if (options.clear) {
@@ -186,7 +186,7 @@ module.exports = function (mikser, context) {
 				data: _.pick(document, ['meta', 'stamp', 'importDate']),
 				date: document.mtime,
 			}
-			if (!config.global) {
+			if (!options.global) {
 				data.context = machineId
 				data.expire = options.expire
 			}
@@ -214,7 +214,7 @@ module.exports = function (mikser, context) {
 			let data = {
 				vaultId: aguid(document._id),
 			}
-			if (!config.global) data.context = machineId
+			if (!options.global) data.context = machineId
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
