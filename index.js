@@ -51,7 +51,7 @@ module.exports = function (mikser, context) {
 		return Promise.resolve()
 	}
 
-	if (!options.whiteboxGlobal) {
+	if (!options.global) {
 		options.expire = options.expire || '10 days'
 		console.log('Expire:', options.expire)
 	}
