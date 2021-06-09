@@ -116,11 +116,13 @@ module.exports = function (mikser, context) {
 											maxBodyLength: Infinity
 										})
 										.then((response) => {
-											for (let file in response.uploads) {
-												console.log(
-													'📦', file, 
-													'🔗', response.uploads[file]
-												)
+											if (response.data.uploads) {
+												for (let file in response.data.uploads) {
+													console.log(
+														'📦', file, 
+														'🔗', response.data.uploads[file]
+													)
+												}
 											}
 										})
 										.catch((err) => console.error('Error uplaoding:', err))									
