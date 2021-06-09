@@ -122,7 +122,7 @@ module.exports = function (mikser, context) {
 														'📦', file, 
 													)
 													console.log(
-														'🔗', response.data.uploads[file]
+														'🌐', response.data.uploads[file]
 													)
 												}
 											}
