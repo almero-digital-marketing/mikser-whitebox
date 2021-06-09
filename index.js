@@ -120,6 +120,8 @@ module.exports = function (mikser, context) {
 												for (let file in response.data.uploads) {
 													console.log(
 														'📦', file, 
+													)
+													console.log(
 														'🔗', response.data.uploads[file]
 													)
 												}
@@ -231,7 +233,7 @@ module.exports = function (mikser, context) {
 			}
 		})
 
-		mikser.on('mikser.manager.sync', async () => {
+		const sync = async () => {
 			if (!options.clear) {
 				let files = await glob('storage/**/*', { cwd: mikser.config.outputFolder })
 				for (let file of files) {
@@ -242,7 +244,9 @@ module.exports = function (mikser, context) {
 					}
 				}
 			}
-		})
+		}
+		mikser.on('mikser.manager.sync', sync)
+		mikser.on('mikser.tools.runtimeSync', sync)
 
 		mikser.on('mikser.watcher.fileAction', async (event, file) => {
 			if (event == 'unlink' && file.indexOf('storage') != -1) {
