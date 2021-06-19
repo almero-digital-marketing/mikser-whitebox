@@ -247,6 +247,7 @@ module.exports = function (mikser, context) {
 		}
 		mikser.on('mikser.manager.sync', sync)
 		mikser.on('mikser.tools.runtimeSync', sync)
+		mikser.on('mikser.tools.shutdown', sync)
 
 		mikser.on('mikser.watcher.fileAction', async (event, file) => {
 			if (event == 'unlink' && file.indexOf('storage') != -1) {
