@@ -14,12 +14,15 @@ const cluster = require('cluster')
 const { throttle } = require('throttle-debounce')
 const { flockAsync } = Promise.promisifyAll(require('fs-ext'))	
 const { machineIdSync } = require('node-machine-id')
+const { link } = require('fs')
 
-module.exports = function (mikser, context) {
+module.exports = async function (mikser, context) {
 	const machineId = machineIdSync() + '_' + os.hostname() + '_' + os.userInfo().username
 	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
 		config || {
+			layout: {
+			},
 			services: {
 				feed: {
 					url: 'https://feed.whitebox.pro',
@@ -155,6 +158,17 @@ module.exports = function (mikser, context) {
 				console.log('🗑️', relative)
 				return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
 			})
+		},
+		link(file) {
+			let data = {
+				file
+			}
+			if (!options.global) data.context = machineId
+			return axios
+			.post(options.services.storage.url + '/' + options.services.storage.token + '/link', data)
+			.then((response) => {
+				return response.data.link
+			})
 		}
 	}
 
@@ -166,6 +180,24 @@ module.exports = function (mikser, context) {
 	})
 
 	if (!context) {
+		let layoutSource, layoutTemplate, layoutStats
+		if (options.layout.source) {
+			layoutSource = path.join(mikser.options.workingFolder, options.layout.source)
+		}
+		if (layoutSource && await fs.existsAsync(layoutSource)) {
+			layoutStats = await fs.statAsync(layoutSource)
+			layoutTemplate = await fs.readFileAsync(layoutSource, 'utf8')
+			if (options.layout.meta.partials && options.layout.meta.partials.head) {
+				layoutTemplate = layoutTemplate.replace('</head>', '<%- @partials.head() %></head>')
+			} 
+			if (options.layout.meta.partials && options.layout.meta.partials.body) {
+				layoutTemplate = layoutTemplate.replace('</body>', '<%- @partials.body() %></body>')
+			}
+			if (layoutSource.indexOf(mikser.options.outputFolder) != -1) {
+				await fs.unlinkAsync(layoutSource)
+			}
+		}
+	
 		let clear = Promise.resolve()
 		if (options.clear || options.refresh) {
 			console.log('Clear whtiebox data')
@@ -184,9 +216,8 @@ module.exports = function (mikser, context) {
 			autostart: true
 		})
 
-		mikser.on('mikser.manager.importDocument', (document) => {
+		mikser.on('mikser.manager.importDocument', async (document) => {
 			if (document.meta.target != 'whitebox' || !document.meta.layout) return Promise.resolve()
-			document.render = false
 			let data = {
 				passportId: uuidv1(),
 				vaultId: aguid(document._id),
@@ -214,6 +245,26 @@ module.exports = function (mikser, context) {
 					console.log('✔️', data.refId)
 					return plugin.api('feed', '/api/catalog/keep/one', data, options)
 				})
+			}
+			
+			if (layoutTemplate) {
+				let layout = {
+					_id: document.meta.layout,
+					stamp: mikser.stamp,
+					importDate: new Date(),
+					source: layoutSource + '.ect',
+					collection: 'layouts',
+					meta: options.layout.meta,
+					mtime: layoutStats.mtime,
+					atime: layoutStats.atime,
+					ctime: layoutStats.ctime,
+					birthtime: layoutStats.birthtime,
+					size: layoutStats.size,
+					template: layoutTemplate,
+				}
+				await mikser.database.layouts.save(layout)
+			} else {
+				document.render = false
 			}
 		})
 
@@ -256,5 +307,17 @@ module.exports = function (mikser, context) {
 		})
 
 		return clear.then(() => plugin)
+	}
+	else {
+		context.storage = (file) => {
+			if(!file) return file
+			if (file.indexOf('/storage') != 0 && file.indexOf('storage') != 0) {
+				if (file[0] == '/') file = '/storage' + file
+				else file = '/storage/' + file
+			}
+			return context.processAsync(() => {
+				return plugin.link(file)
+			})
+		}
 	}
 }
