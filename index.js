@@ -21,8 +21,6 @@ module.exports = async function (mikser, context) {
 	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
 		config || {
-			layout: {
-			},
 			services: {
 				feed: {
 					url: 'https://feed.whitebox.pro',
@@ -181,7 +179,7 @@ module.exports = async function (mikser, context) {
 
 	if (!context) {
 		let layoutSource, layoutTemplate, layoutStats
-		if (options.layout.source) {
+		if (options.layout && options.layout.source) {
 			layoutSource = path.join(mikser.options.workingFolder, options.layout.source)
 		}
 		if (layoutSource && await fs.existsAsync(layoutSource)) {
