@@ -18,7 +18,7 @@
   "homepage": "https://github.com/almero-digital-marketing/mikser-whitebox#readme",
   "dependencies": {
     "aguid": "^2.0.0",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "bluebird": "^3.7.2",
     "form-data": "^3.0.0",
     "fs-ext": "^2.0.0",
