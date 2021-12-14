@@ -14,7 +14,6 @@ const cluster = require('cluster')
 const { throttle } = require('throttle-debounce')
 const { flockAsync } = Promise.promisifyAll(require('fs-ext'))	
 const { machineIdSync } = require('node-machine-id')
-const { link } = require('fs')
 
 module.exports = async function (mikser, context) {
 	const machineId = machineIdSync() + '_' + os.hostname() + '_' + os.userInfo().username
@@ -31,6 +30,8 @@ module.exports = async function (mikser, context) {
 			},
 		}
 	)
+	const layouts = []
+
 	if (cluster.isMaster) {
 		mikser.cli.option('-wc, --whitebox-clear', 'clear WhiteBox documents').init()
 		mikser.cli.option('-wr, --whitebox-refresh', 'refresh WhiteBox documents').init()
@@ -120,10 +121,10 @@ module.exports = async function (mikser, context) {
 											if (response.data.uploads) {
 												for (let file in response.data.uploads) {
 													console.log(
-														'📦', file, 
+														'📦 ', file, 
 													)
 													console.log(
-														'🌐', response.data.uploads[file]
+														'🌐 ', response.data.uploads[file]
 													)
 												}
 											}
@@ -153,7 +154,7 @@ module.exports = async function (mikser, context) {
 			return axios
 			.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', data)
 			.then(() => {
-				console.log('🗑️', relative)
+				console.log('🗑️ ', relative)
 				return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
 			})
 		},
@@ -216,11 +217,12 @@ module.exports = async function (mikser, context) {
 
 		mikser.on('mikser.manager.importDocument', async (document) => {
 			if (document.meta.target != 'whitebox' || !document.meta.layout) return Promise.resolve()
+			if (layouts.indexOf(document.meta.layout) == -1) layouts.push(document.meta.layout)
 			let data = {
 				passportId: uuidv1(),
 				vaultId: aguid(document._id),
-				refId: document.url.replace('/index.html', '') || '/',
-				type: document.meta.layout,
+				refId: document.url.replace('/' + mikser.config.cleanUrlDestination, '') || '/',
+				type: 'mikser.' + document.meta.layout,
 				data: _.pick(document, ['meta', 'stamp', 'importDate']),
 				date: document.mtime,
 			}
@@ -240,8 +242,8 @@ module.exports = async function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('✔️', data.refId)
-					return plugin.api('feed', '/api/catalog/keep/one', data, options)
+					console.log('✔️ ', data.refId)
+					return plugin.api('feed', '/api/catalog/keep/one', data)
 				})
 			}
 			
@@ -253,7 +255,7 @@ module.exports = async function (mikser, context) {
 					source: layoutSource + '.ect',
 					collection: 'layouts',
 					meta: options.layout.meta,
-					mtime: layoutStats.mtime,
+					mtime: Date.now(),
 					atime: layoutStats.atime,
 					ctime: layoutStats.ctime,
 					birthtime: layoutStats.birthtime,
@@ -276,8 +278,8 @@ module.exports = async function (mikser, context) {
 			if (!options.clear) {
 				queue.push(() => {
 					clearCache()
-					console.log('🗑️', document._id)
-					return plugin.api('feed', '/api/catalog/remove', data, options)
+					console.log('🗑️ ', document._id)
+					return plugin.api('feed', '/api/catalog/remove', data)
 				})
 			}
 		})
@@ -294,6 +296,19 @@ module.exports = async function (mikser, context) {
 				}
 			}
 		}
+
+		mikser.on('mikser.manager.glob', () => {
+			console.log('♻️ ', layouts.join(', '))
+			for(let layout of layouts) {
+				queue.push(() => {
+					return api('feed', '/api/catalog/expire', {
+						type: 'mikser.' + layout,
+						stamp
+					})
+				}) 
+			}
+		})
+
 		mikser.on('mikser.manager.sync', sync)
 		mikser.on('mikser.tools.runtimeSync', sync)
 		mikser.on('mikser.tools.shutdown', sync)
