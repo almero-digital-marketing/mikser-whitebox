@@ -301,9 +301,9 @@ module.exports = async function (mikser, context) {
 			console.log('♻️ ', layouts.join(', '))
 			for(let layout of layouts) {
 				queue.push(() => {
-					return api('feed', '/api/catalog/expire', {
+					return plugin.api('feed', '/api/catalog/expire', {
 						type: 'mikser.' + layout,
-						stamp
+						stamp: mikser.stamp
 					})
 				}) 
 			}
