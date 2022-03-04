@@ -223,7 +223,7 @@ module.exports = async function (mikser, context) {
 				vaultId: aguid(document._id),
 				refId: document.url.replace('/' + mikser.config.cleanUrlDestination, '') || '/',
 				type: 'mikser.' + document.meta.layout,
-				data: _.pick(document, ['meta', 'stamp', 'importDate']),
+				data: _.pick(document, ['meta', 'stamp', 'importDate', 'content']),
 				date: document.mtime,
 			}
 			if (!options.global) {
