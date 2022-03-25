@@ -17,9 +17,8 @@ const { machineIdSync } = require('node-machine-id')
 
 module.exports = async function (mikser, context) {
 	const machineId = machineIdSync() + '_' + os.hostname() + '_' + os.userInfo().username
-	let config = mikser.config['whitebox']
 	let options = _.defaultsDeep(
-		config || {
+		mikser.config.whitebox || {
 			services: {
 				feed: {
 					url: 'https://feed.whitebox.pro',
@@ -36,6 +35,11 @@ module.exports = async function (mikser, context) {
 		mikser.cli.option('-wc, --whitebox-clear', 'clear WhiteBox documents').init()
 		mikser.cli.option('-wr, --whitebox-refresh', 'refresh WhiteBox documents').init()
 		mikser.cli.option('-wg, --whitebox-global', 'use WhiteBox global context').init()
+
+		if (mikser.config.watcher) {
+			mikser.config.watcher.output = [...(mikser.config.watcher.output || []), '**/storage/**/*'];
+					
+		}
 
 		if (mikser.cli.whiteboxClear) {
 			options.clear = true
@@ -85,7 +89,7 @@ module.exports = async function (mikser, context) {
 			pendingUploads[file] = true
 			return fs.openAsync(file, 'r').then(fd => {
 				return flockAsync(fd, 'sh').then(() => {
-					// mikser.diagnostics.log(this, 'debug', `[whitebox] File locked: ${file}`)
+					// console.log(this, 'debug', `[whitebox] File locked: ${file}`)
 					let relative = file.replace(mikser.config.outputFolder, '')
 					let data = {
 						file: relative
@@ -95,7 +99,7 @@ module.exports = async function (mikser, context) {
 					.post(options.services.storage.url + '/' + options.services.storage.token + '/hash', data)
 					.then((response) => {
 						return hasha.fromFile(file, { algorithm: 'md5' }).then((hash) => {
-								// mikser.diagnostics.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
+								// console.log(this, 'debug', `[whitebox] MD5: ${file} ${hash} ${response.data.hash}`)
 								if (!response.data.success || hash != response.data.hash) {
 									let uploadHeaders = {}
 									if (!options.global) {
@@ -155,7 +159,7 @@ module.exports = async function (mikser, context) {
 			.post(options.services.storage.url + '/' + options.services.storage.token + '/unlink', data)
 			.then(() => {
 				console.log('🗑️ ', relative)
-				return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative))
+				return fs.unlinkAsync(path.join(mikser.config.outputFolder, relative)).catch(err => {})
 			})
 		},
 		link(file) {
@@ -316,6 +320,17 @@ module.exports = async function (mikser, context) {
 		mikser.on('mikser.watcher.fileAction', async (event, file) => {
 			if (event == 'unlink' && file.indexOf('storage') != -1) {
 				await plugin.unlink(file)
+			}
+		})
+		mikser.on('mikser.watcher.outputAction', async (event, file) => {
+			file = path.join(mikser.config.outputFolder, file)
+			if (event == 'unlink' && file.indexOf('storage') != -1) {
+				await plugin.unlink(file)
+			} else {
+				const stat = await fs.lstatAsync(file)
+				if (stat.isFile()) {
+					await plugin.upload(file)
+				}
 			}
 		})
 
