@@ -221,12 +221,12 @@ module.exports = async function (mikser, context) {
 
 		mikser.on('mikser.manager.importDocument', async (document) => {
 			if (document.meta.target != 'whitebox' || !document.meta.layout) return Promise.resolve()
-			if (layouts.indexOf(document.meta.layout) == -1) layouts.push(document.meta.layout)
+			if (document.meta.layout && layouts.indexOf(document.meta.layout) == -1) layouts.push(document.meta.layout)
 			let data = {
 				passportId: uuidv1(),
 				vaultId: aguid(document._id),
 				refId: document.url.replace('/' + mikser.config.cleanUrlDestination, '') || '/',
-				type: 'mikser.' + document.meta.layout,
+				type: 'mikser.' + document.meta.layout || document.meta.type,
 				data: _.pick(document, ['meta', 'stamp', 'importDate', 'content']),
 				date: document.mtime,
 			}
