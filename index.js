@@ -229,6 +229,7 @@ module.exports = async function (mikser, context) {
 				type: 'mikser.' + document.meta.layout || document.meta.type,
 				data: _.pick(document, ['meta', 'stamp', 'importDate', 'content']),
 				date: document.mtime,
+				vaults: document.meta.vaults,
 			}
 			if (!options.global) {
 				data.context = machineId
