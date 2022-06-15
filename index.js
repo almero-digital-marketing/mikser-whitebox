@@ -144,10 +144,15 @@ module.exports = async function (mikser, context) {
 							console.error(err)
 							return flockAsync(fd, 'un')
 						})
-				}).catch(err => {
+				})
+				.catch(err => {
 					console.error('Lock failed:', file, err)
 				})
-			}).then(() => delete pendingUploads[file])
+			})
+			.catch(() => {
+				console.log('File skipped:', file)
+			})
+			.then(() => delete pendingUploads[file])
 		},
 		unlink(file) {
 			let relative = file.replace(mikser.config.filesFolder, '')
@@ -182,22 +187,38 @@ module.exports = async function (mikser, context) {
 		return plugin.api('feed', '/api/catalog/clear/cache', data, options)
 	})
 
-	if (!context) {
+	if (context) {
+		context.storage = (file) => {
+			if(!file) return file
+			if (file.indexOf('/storage') != 0 && file.indexOf('storage') != 0) {
+				if (file[0] == '/') file = '/storage' + file
+				else file = '/storage/' + file
+			}
+			return context.processAsync(() => {
+				return plugin.link(file)
+			})
+		}
+	} 
+	else if (cluster.isMaster) {
 		let layoutSource, layoutTemplate, layoutStats
 		if (options.layout && options.layout.source) {
-			layoutSource = path.join(mikser.options.workingFolder, options.layout.source)
+			layoutSource = path.resolve(path.join(mikser.options.workingFolder, options.layout.source))
 		}
-		if (layoutSource && await fs.existsAsync(layoutSource)) {
-			layoutStats = await fs.statAsync(layoutSource)
-			layoutTemplate = await fs.readFileAsync(layoutSource, 'utf8')
-			if (options.layout.meta.partials && options.layout.meta.partials.head) {
-				layoutTemplate = layoutTemplate.replace('</head>', '<%- @partials.head() %></head>')
-			} 
-			if (options.layout.meta.partials && options.layout.meta.partials.body) {
-				layoutTemplate = layoutTemplate.replace('</body>', '<%- @partials.body() %></body>')
-			}
-			if (layoutSource.indexOf(mikser.options.outputFolder) != -1) {
-				await fs.unlinkAsync(layoutSource)
+		if (layoutSource) {
+			if (await fs.existsAsync(layoutSource)) {
+				layoutStats = await fs.statAsync(layoutSource)
+				layoutTemplate = await fs.readFileAsync(layoutSource, 'utf8')
+				if (options.layout.meta.partials && options.layout.meta.partials.head) {
+					layoutTemplate = layoutTemplate.replace('</head>', '<%- @partials.head() %></head>')
+				} 
+				if (options.layout.meta.partials && options.layout.meta.partials.body) {
+					layoutTemplate = layoutTemplate.replace('</body>', '<%- @partials.body() %></body>')
+				}
+				if (layoutSource.indexOf(mikser.options.outputFolder) != -1) {
+					await fs.unlinkAsync(layoutSource)
+				}
+			} else {
+				console.error('Template layout is missing:', layoutSource)
 			}
 		}
 	
@@ -336,17 +357,5 @@ module.exports = async function (mikser, context) {
 		})
 
 		return clear.then(() => plugin)
-	}
-	else {
-		context.storage = (file) => {
-			if(!file) return file
-			if (file.indexOf('/storage') != 0 && file.indexOf('storage') != 0) {
-				if (file[0] == '/') file = '/storage' + file
-				else file = '/storage/' + file
-			}
-			return context.processAsync(() => {
-				return plugin.link(file)
-			})
-		}
 	}
 }
