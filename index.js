@@ -201,7 +201,7 @@ module.exports = async function (mikser, context) {
 	} 
 	else if (cluster.isMaster) {
 		let layoutSource, layoutTemplate, layoutStats
-		if (options.layout && options.layout.source) {
+		if (options.layout) {
 			if (options.layout.source) {
 				layoutSource = path.resolve(path.join(mikser.options.workingFolder, options.layout.source))
 			} else {
